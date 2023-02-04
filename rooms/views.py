@@ -127,18 +127,7 @@ class RoomDetail(APIView):
             raise NotAuthenticated
         if room.owner != request.user:
             raise PermissionDenied
-        serializer = RoomDetailSerializer(
-            room,
-            data=request.data,
-            partial=True,
-        )
-        if serializer.is_valid():
-            updated_room = serializer.save()
-            return Response(
-                AmenitySerializer(updated_room).data,
-            )
-        else:
-            return Response(serializer.errors)       
+        # your magic
 
     def delete(self, request, pk):
         room = self.get_object(pk)
