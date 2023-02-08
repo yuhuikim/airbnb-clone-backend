@@ -2,10 +2,16 @@ from rest_framework.views import APIView
 from .models import Amenity, Room
 from .serializers import AmenitySerializer, RoomListSerializer, RoomDetailSerializer
 from rest_framework.response import Response
-from rest_framework.exceptions import NotFound, NotAuthenticated, ParseError, PermissionDenied
+from rest_framework.exceptions import (
+    NotFound,
+    NotAuthenticated,
+    ParseError,
+    PermissionDenied,
+)
 from rest_framework.status import HTTP_204_NO_CONTENT
 from categories.models import Category
 from django.db import transaction
+
 
 class Amenities(APIView):
     # 모든 view function 은 request를 받는다.
@@ -66,9 +72,15 @@ class AmenityDetail(APIView):
 class Rooms(APIView):
     def get(self, request):
         all_rooms = Room.objects.all()
-        serializer = RoomListSerializer(all_rooms, many=True)
+        serializer = RoomListSerializer(
+            all_rooms,
+            many=True,
+            context={
+                "request": request,
+            },
+        )
         return Response(serializer.data)
-    
+
     def post(self, request):
         # 누가 이 url로 요쳥했는지에 관해 많은 정보를 가지고 있음
         # print(dir(request.user))
@@ -79,7 +91,7 @@ class Rooms(APIView):
                 # save(---) 이 괄호에 추가되는 것들은 save를 할 경우 자동으로 create 메서드가 호출되기 때문에
                 # create 메서드의 인자인 validated_data에 추가될 것임
                 category_pk = request.data.get("category")
-                if not category_pk :
+                if not category_pk:
                     # ParseError는 request가 잘못된 데이터를 가지고 있을 때 발생
                     raise ParseError("Category is required.")
                 try:
@@ -94,7 +106,7 @@ class Rooms(APIView):
                     # try-except 구문을 transaction 내부엔 사용하면 에러난 사실을 모르기 때문에 사용하지 않음
                     with transaction.atomic():
                         room = serializer.save(owner=request.user, category=category)
-                        amenities = request.data.get('amenities')
+                        amenities = request.data.get("amenities")
                         # ManytoMany 필드가 작동하는 방법임
                         for amenity_pk in amenities:
                             amenity = Amenity.objects.get(pk=amenity_pk)
@@ -103,9 +115,9 @@ class Rooms(APIView):
                         return Response(serializer.data)
                 except Exception:
                     raise ParseError("Amenity not found")
-            else: 
+            else:
                 return Response(serializer.errors)
-        else: 
+        else:
             raise NotAuthenticated
 
 
@@ -115,12 +127,19 @@ class RoomDetail(APIView):
             return Room.objects.get(pk=pk)
         except Room.DoesNotExist:
             raise NotFound
-        
+
     def get(self, request, pk):
         room = self.get_object(pk)
-        serializer = RoomDetailSerializer(room)
+        # 원하는 메소드 어떤 것이든 serializer의 context에 접근할 수 있음 --> serializer에서 self.context 사용하면 context에 접근가능하다.
+        # context를 사용하여 serializer 데이터에 데이터를 보낼 수 있음
+        serializer = RoomDetailSerializer(
+            room,
+            context={
+                "request": request,
+            },
+        )
         return Response(serializer.data)
-    
+
     def put(self, request, pk):
         room = self.get_object(pk)
         if not request.user.is_authenticated:
@@ -128,6 +147,40 @@ class RoomDetail(APIView):
         if room.owner != request.user:
             raise PermissionDenied
         # your magic
+        serializer = RoomDetailSerializer(
+            room,
+            data=request.data,
+            partial=True,
+        )
+        if serializer.is_valid():
+            category_pk = request.data.get("category")
+            if category_pk:
+                try:
+                    category = Category.objects.get(pk=category_pk)
+                    if category.kind == Category.CategoryKindChoieces.EXPERIENCES:
+                        raise ParseError("The Category kind should be 'rooms'")
+                except Category.DoesNotExist:
+                    raise ParseError("Category not found")
+            try:
+                with transaction.atomic():
+                    if category_pk:
+                        room = serializer.save(category=category)
+                    else:
+                        room = serializer.save()
+                    amenities = request.data.get("amenities")
+                    if amenities:
+                        room.amenities.clear()
+                        for amenity_pk in amenities:
+                            amenity = Amenity.objects.get(pk=amenity_pk)
+                            room.amenities.add(amenity)
+                            serializer = RoomDetailSerializer(room)
+                    else:
+                        room.amenities.clear()
+                    return Response(serializer.data)
+            except Exception:
+                raise ParseError("Amenity not found")
+        else:
+            return Response(serializer.errors)
 
     def delete(self, request, pk):
         room = self.get_object(pk)
