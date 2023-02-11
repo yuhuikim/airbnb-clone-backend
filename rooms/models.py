@@ -59,7 +59,7 @@ class Room(CommonModel):
     def rating(room):
         count = room.reviews.count()
         if count == 0:
-            return "No Reviews"
+            return 0
         else:
             total_rating = 0
             # for review in room.reviews.all(): # 이것보단 아래로 field를 지정해주는 건이 최적화에 훨씬 좋음 - 성능측면
