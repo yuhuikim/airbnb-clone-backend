@@ -52,10 +52,11 @@ class RoomDetailSerializer(ModelSerializer):
     rating = serializers.SerializerMethodField()
     is_owner = serializers.SerializerMethodField()
     # RoomDetailSerializer가 reviews라는 새로운 필드를 가진다. --> 같은 방을 가리키는 리뷰가 많을 수 있으니 many=True
-    reviews = ReviewSerializer(
-        read_only=True,
-        many=True,
-    )
+    # 리뷰들을 다 불러오면 db가 죽을 수 있기 때문에 제거!
+    # reviews = ReviewSerializer(
+    #     read_only=True,
+    #     many=True,
+    # )
 
     class Meta:
         model = Room
