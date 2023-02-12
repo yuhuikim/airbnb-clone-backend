@@ -43,6 +43,8 @@ class RoomListSerializer(ModelSerializer):
         return room.rating()
 
     def get_is_owner(self, room):
+        # 시리얼라이저의 context에서 request 객체를 가져오는 것
+        # class Rooms에 보면 context={"request": request,} 를 써서 request 객체를 보내주고 있음
         request = self.context["request"]
         # 방의 owner가 요청을 보낸 유저랑 같은지 아닌지에 따라서 true, false로 반환함
         return room.owner == request.user
