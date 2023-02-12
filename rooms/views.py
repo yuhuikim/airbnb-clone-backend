@@ -1,3 +1,4 @@
+from django.conf import settings
 from rest_framework.views import APIView
 from .models import Amenity, Room
 from .serializers import AmenitySerializer, RoomListSerializer, RoomDetailSerializer
@@ -12,7 +13,7 @@ from rest_framework.status import HTTP_204_NO_CONTENT
 from categories.models import Category
 from django.db import transaction
 from reviews.serializers import ReviewSerializer
-
+from medias.serializers import PhotoSerializer
 
 class Amenities(APIView):
     # 모든 view function 은 request를 받는다.
@@ -234,7 +235,7 @@ class RoomReviews(APIView):
             page = int("page")
         except ValueError:
             page = 1
-        page_size = 3
+        page_size = settings.PAGE_SIZE
         start = (page - 1) * page_size
         end = start + page_size
         room = self.get_object(pk)
@@ -244,3 +245,28 @@ class RoomReviews(APIView):
             many=True,
         )
         return Response(serializer.data)
+    
+class RoomPhotos(APIView):
+    def get_object(self, pk):
+        try:
+            return Room.objects.get(pk=pk)
+        except Room.DoesNotExist:
+            raise NotFound
+
+    def post(self, request, pk):
+        room = self.get_object(pk)
+        if not request.user.is_authenticated:
+            raise NotAuthenticated
+        if request.user != room.owner:
+            raise PermissionDenied
+        serializer = PhotoSerializer(data=request.data)
+        # PhotoSerializer는 file, description만 갖고 있기 때문에, save를 해주면 file, description만 가진 사진을 만들어낸다.
+        # 그러나 사진은 room에 속하는지 experience에 속하는지 알아야한다. 이건 이전에 유저가 방을 만들 때 발생했던 일과 동일하다.
+        # 우리는 시리얼라이저에게 방의 주인을 말해줬었음 --> 그렇기때문에 사진이 속한 방도 보내줘야 한다는 뜻임
+        if serializer.is_valid():
+            photo = serializer.save(room=room)
+            # 방과 연결된 사진을 만들어주기 위함
+            serializer = PhotoSerializer(photo)
+            return Response(serializer.data)
+        else:
+            return Response(serializer.errors)

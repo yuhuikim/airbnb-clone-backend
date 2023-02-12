@@ -17,6 +17,9 @@ from django.contrib import admin
 from django.urls import path, include
 # from rooms import views as room_views
 # from users import views as users_views
+from django.conf.urls.static import static
+# settings 파일을 import 할 수 있게 해줌, settings.py에 대한 프록시
+from django.conf import settings
 
 
 urlpatterns = [
@@ -25,5 +28,4 @@ urlpatterns = [
     path("api/v1/rooms/",include("rooms.urls")),
     path("api/v1/categories/",include("categories.urls")),
     path("api/v1/experiences/",include("experiences.urls")),
-
-]
+] + static(settings.MEDIA_URL, document_root = settings.MEDIA_ROOT)
