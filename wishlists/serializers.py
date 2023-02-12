@@ -14,6 +14,7 @@ class WishlistSerializer(ModelSerializer):
         # serializer.save를 호출하면 아래에 지정한 모델을 받는다!
         model = Wishlist
         fields = (
+            "pk",
             "name",
             "rooms",
         )

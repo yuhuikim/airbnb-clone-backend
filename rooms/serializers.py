@@ -5,6 +5,7 @@ from categories.serializers import CategorySerializer
 from rest_framework import serializers
 from reviews.serializers import ReviewSerializer
 from medias.serializers import PhotoSerializer
+from wishlists.models import Wishlist
 
 
 class AmenitySerializer(ModelSerializer):
@@ -69,7 +70,7 @@ class RoomDetailSerializer(ModelSerializer):
         many=True,
         read_only=True,
     )
-
+    is_liked = serializers.SerializerMethodField()
 
     class Meta:
         model = Room
@@ -89,3 +90,15 @@ class RoomDetailSerializer(ModelSerializer):
     # def create(self, validated_data):
     #     print(validated_data)
     #     return
+
+    def get_is_liked(self, room):
+        request = self.context["request"]
+        # request.user가 갖고있는 wishlist를 찾아와야함
+        # room을 보고있는 user가 소유한 wishlists를 찾는 것, 즉 room_list 안에 그 room을 가지고 있는 wishlist를 찾아냄
+        # user가 만든 wishlist 중에 room_id가 있는 room list를 포함한 wishlist를 찾음
+        # filter는 array 결과로 주기 때문에 T/F로 반환받기 위해 exists를 사용!
+        wish = Wishlist.objects.filter(
+            user=request.user,
+            rooms__pk=room.pk,
+        ).exists()
+        return wish
