@@ -107,6 +107,7 @@ class WishlistToggle(APIView):
         '''
         # Wishlist 모델에 있는 ManyToMany field의 room의 list로 들어감
         # wishlist 내부의 room list으로 접근해서 filter 하는 것 --> room의 pk랑 일치하는 pk를 갖는 room이 있는지 확인
+        # room_pk는 user가 url에 적은 room_pk로 부터 알 수 있음
         if wishlist.rooms.filter(pk=room.pk).exists():
             # room이 wishlist의 rooms에 있으면, 즉 user가 wishlist에서 room을 지우고 싶으면
             wishlist.rooms.remove(room)

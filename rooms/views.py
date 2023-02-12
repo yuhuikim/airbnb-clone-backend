@@ -1,7 +1,8 @@
 from django.conf import settings
+from django.db import transaction
+from django.utils import timezone
+
 from rest_framework.views import APIView
-from .models import Amenity, Room
-from .serializers import AmenitySerializer, RoomListSerializer, RoomDetailSerializer
 from rest_framework.response import Response
 from rest_framework.exceptions import (
     NotFound,
@@ -10,11 +11,25 @@ from rest_framework.exceptions import (
     PermissionDenied,
 )
 from rest_framework.status import HTTP_204_NO_CONTENT
+from rest_framework.permissions import IsAuthenticatedOrReadOnly
+
+
+from .models import Amenity, Room
+from .serializers import AmenitySerializer, RoomListSerializer, RoomDetailSerializer
 from categories.models import Category
-from django.db import transaction
 from reviews.serializers import ReviewSerializer
 from medias.serializers import PhotoSerializer
-from rest_framework.permissions import IsAuthenticatedOrReadOnly
+from bookings.models import Booking
+from bookings.serializers import PublicBookingSerializer
+
+
+"""
+Django import 순서(관례)
+1. Django와 관련된 것들을 import -> Django package에서 오는 것들을 우선적으로!
+2. third-party package를 import 
+3. 같은 앱의 것들을 import -> .으로 시작하는 것은 같은 앱, 같은 폴더에 있다는 것
+4. 커스텀 app에 관한 것들 import
+"""
 
 
 class Amenities(APIView):
@@ -150,7 +165,7 @@ class Rooms(APIView):
 
 
 class RoomDetail(APIView):
-    
+
     permission_classes = [IsAuthenticatedOrReadOnly]
 
     def get_object(self, pk):
@@ -254,19 +269,20 @@ class RoomReviews(APIView):
         )
         return Response(serializer.data)
 
-    def post(self, request,pk):
+    def post(self, request, pk):
         # 유저 데이터로부터 오는 페이로드와 평점
         serializer = ReviewSerializer(data=request.data)
         if serializer.is_valid():
             review = serializer.save(
                 # + 이 요청을 보내는 유저
-                user = request.user,
+                user=request.user,
                 # + 우리가 리뷰를 쓰고 있는 방
-                room=self.get_object(pk)
-            ) # ==> serializer.save를 저장
+                room=self.get_object(pk),
+            )  # ==> serializer.save를 저장
             # 새로 생성된 리뷰를 받기
             serializer = ReviewSerializer(review)
             return Response(serializer.data)
+
 
 class RoomPhotos(APIView):
 
@@ -295,3 +311,50 @@ class RoomPhotos(APIView):
             return Response(serializer.data)
         else:
             return Response(serializer.errors)
+
+
+class RoomBookings(APIView):
+
+    permission_classes = [IsAuthenticatedOrReadOnly]
+
+    def get_object(self, pk):
+        try:
+            return Room.objects.get(pk=pk)
+        except:
+            raise NotFound
+
+    def get(self, reqeust, pk):
+        """
+        # 1번 방법
+        room = self.get_object(pk)
+        # 특정 room에 대한 booking 찾기
+        bookings = Booking.objects.filter(room=room)
+
+        # 2번 방법 : user가 보낸 pk를 가지는 room에 대한 booking을 찾으면 됨
+        bookings = Booking.objects.filter(room__pk=pk)
+
+        user가 보고 있는 room에 대한 예약을 pk를 사용해서 찾을 수 있음
+        room__pk에 url을 통해 user가 보낸 pk가 들어가짐 만약에 room에 예약이 없으면 결과는 빈 queryset이 된다.
+        또는 받은 pk가 존재하지 않는 room_pk여도 빈 queryset이 반환됨 (즉 존재하지 않는 room)
+
+        user가 존재하지 않는 room에 대한 예약을 요청하면 room이 존재하지 않는다고 알려줄거면
+        1번 방법을 사용해야하고, user가 존재하는 room의 pk를 보낼거라고 믿는다면 2번 방법을 사용해서 검색하면 된다.
+        1번 방법은 db 조회를 2번하게 되는 것이고, 2번 방법은 1번만 조회하는 것이다.
+        그러나 2번 방법은 booking 또는 room이 존재하지 않는 경우 결과값이 동일해서 user는 방자체가 없는 상황임에도 불구하고
+        예약이 안된 것이라고 생각할 것이다. 상황에 맞게 쓰면 됨
+        relationship(관계)로 filter를 할 때는 room을 먼저 찾아낼 필요는 없다. 즉 1번 처럼 할 필요는 없다.
+        """
+
+        room = self.get_object(pk)
+        # 현지시간
+        now = timezone.localtime(timezone.now()).date()
+        # 특정 room에 대한 booking 찾기
+        # check_in 날짜가 현재 날짜보다 큰 booking을 찾자! 
+        bookings = Booking.objects.filter(
+            room=room,
+            kind=Booking.BookingKindChoices.ROOM,
+            check_in__gt=now,
+        )
+        serializer = PublicBookingSerializer(bookings, many=True,)
+        return Response(serializer.data)
+    
