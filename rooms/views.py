@@ -226,6 +226,9 @@ class RoomDetail(APIView):
 
 
 class RoomReviews(APIView):
+
+    permission_classes = [IsAuthenticatedOrReadOnly]
+
     def get_object(self, pk):
         try:
             return Room.objects.get(pk=pk)
@@ -251,11 +254,24 @@ class RoomReviews(APIView):
         )
         return Response(serializer.data)
 
+    def post(self, request,pk):
+        # 유저 데이터로부터 오는 페이로드와 평점
+        serializer = ReviewSerializer(data=request.data)
+        if serializer.is_valid():
+            review = serializer.save(
+                # + 이 요청을 보내는 유저
+                user = request.user,
+                # + 우리가 리뷰를 쓰고 있는 방
+                room=self.get_object(pk)
+            ) # ==> serializer.save를 저장
+            # 새로 생성된 리뷰를 받기
+            serializer = ReviewSerializer(review)
+            return Response(serializer.data)
 
 class RoomPhotos(APIView):
 
     permission_classes = [IsAuthenticatedOrReadOnly]
-    
+
     def get_object(self, pk):
         try:
             return Room.objects.get(pk=pk)
