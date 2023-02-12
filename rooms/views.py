@@ -14,6 +14,8 @@ from categories.models import Category
 from django.db import transaction
 from reviews.serializers import ReviewSerializer
 from medias.serializers import PhotoSerializer
+from rest_framework.permissions import IsAuthenticatedOrReadOnly
+
 
 class Amenities(APIView):
     # 모든 view function 은 request를 받는다.
@@ -96,6 +98,10 @@ class RoomAmenities(APIView):
 
 
 class Rooms(APIView):
+    # IsAuthenticatedOrReadOnly는 인증 받았거나 혹은 읽기 전용 권한이다.
+    # GET 요청이면 누구나 통과할 수 있게 해주고, POST, PUT, DELETE 요청이면 오직 인증받은 사람만 통과할 수 있다.
+    permission_classes = [IsAuthenticatedOrReadOnly]
+
     def get(self, request):
         all_rooms = Room.objects.all()
         serializer = RoomListSerializer(
@@ -110,44 +116,43 @@ class Rooms(APIView):
     def post(self, request):
         # 누가 이 url로 요쳥했는지에 관해 많은 정보를 가지고 있음
         # print(dir(request.user))
-
-        if request.user.is_authenticated:
-            serializer = RoomDetailSerializer(data=request.data)
-            if serializer.is_valid():
-                # save(---) 이 괄호에 추가되는 것들은 save를 할 경우 자동으로 create 메서드가 호출되기 때문에
-                # create 메서드의 인자인 validated_data에 추가될 것임
-                category_pk = request.data.get("category")
-                if not category_pk:
-                    # ParseError는 request가 잘못된 데이터를 가지고 있을 때 발생
-                    raise ParseError("Category is required.")
-                try:
-                    category = Category.objects.get(pk=category_pk)
-                    if category.kind == Category.CategoryKindChoieces.EXPERIENCES:
-                        raise ParseError("The Category kind should be 'rooms'")
-                except Category.DoesNotExist:
-                    raise ParseError("Category not found")
-                try:
-                    # transaction.atomic이 없을 떈, 코드를 실행할 때마다, 쿼리가 즉시 DB에 반영됨
-                    # 도중에 에러가 발생한다면, 그 변경사항들을 DB에 반영하지 않는다.
-                    # try-except 구문을 transaction 내부엔 사용하면 에러난 사실을 모르기 때문에 사용하지 않음
-                    with transaction.atomic():
-                        room = serializer.save(owner=request.user, category=category)
-                        amenities = request.data.get("amenities")
-                        # ManytoMany 필드가 작동하는 방법임
-                        for amenity_pk in amenities:
-                            amenity = Amenity.objects.get(pk=amenity_pk)
-                            room.amenities.add(amenity)
-                        serializer = RoomDetailSerializer(room)
-                        return Response(serializer.data)
-                except Exception:
-                    raise ParseError("Amenity not found")
-            else:
-                return Response(serializer.errors)
+        serializer = RoomDetailSerializer(data=request.data)
+        if serializer.is_valid():
+            # save(---) 이 괄호에 추가되는 것들은 save를 할 경우 자동으로 create 메서드가 호출되기 때문에
+            # create 메서드의 인자인 validated_data에 추가될 것임
+            category_pk = request.data.get("category")
+            if not category_pk:
+                # ParseError는 request가 잘못된 데이터를 가지고 있을 때 발생
+                raise ParseError("Category is required.")
+            try:
+                category = Category.objects.get(pk=category_pk)
+                if category.kind == Category.CategoryKindChoieces.EXPERIENCES:
+                    raise ParseError("The Category kind should be 'rooms'")
+            except Category.DoesNotExist:
+                raise ParseError("Category not found")
+            try:
+                # transaction.atomic이 없을 떈, 코드를 실행할 때마다, 쿼리가 즉시 DB에 반영됨
+                # 도중에 에러가 발생한다면, 그 변경사항들을 DB에 반영하지 않는다.
+                # try-except 구문을 transaction 내부엔 사용하면 에러난 사실을 모르기 때문에 사용하지 않음
+                with transaction.atomic():
+                    room = serializer.save(owner=request.user, category=category)
+                    amenities = request.data.get("amenities")
+                    # ManytoMany 필드가 작동하는 방법임
+                    for amenity_pk in amenities:
+                        amenity = Amenity.objects.get(pk=amenity_pk)
+                        room.amenities.add(amenity)
+                    serializer = RoomDetailSerializer(room)
+                    return Response(serializer.data)
+            except Exception:
+                raise ParseError("Amenity not found")
         else:
-            raise NotAuthenticated
+            return Response(serializer.errors)
 
 
 class RoomDetail(APIView):
+    
+    permission_classes = [IsAuthenticatedOrReadOnly]
+
     def get_object(self, pk):
         try:
             return Room.objects.get(pk=pk)
@@ -168,8 +173,8 @@ class RoomDetail(APIView):
 
     def put(self, request, pk):
         room = self.get_object(pk)
-        if not request.user.is_authenticated:
-            raise NotAuthenticated
+        # if not request.user.is_authenticated:
+        #     raise NotAuthenticated
         if room.owner != request.user:
             raise PermissionDenied
         # your magic
@@ -211,8 +216,8 @@ class RoomDetail(APIView):
     def delete(self, request, pk):
         room = self.get_object(pk)
         # 방의 주인이 아니라면 삭제해선 안됨 <-- 확인하려면 로그인이 되어있어야 함
-        if not request.user.is_authenticated:
-            raise NotAuthenticated
+        # if not request.user.is_authenticated:
+        #     raise NotAuthenticated
         # 방의 주인과 request.user의 유저가 같은지 확인하기
         if room.owner != request.user:
             raise PermissionDenied
@@ -245,8 +250,12 @@ class RoomReviews(APIView):
             many=True,
         )
         return Response(serializer.data)
-    
+
+
 class RoomPhotos(APIView):
+
+    permission_classes = [IsAuthenticatedOrReadOnly]
+    
     def get_object(self, pk):
         try:
             return Room.objects.get(pk=pk)
@@ -255,8 +264,8 @@ class RoomPhotos(APIView):
 
     def post(self, request, pk):
         room = self.get_object(pk)
-        if not request.user.is_authenticated:
-            raise NotAuthenticated
+        # if not request.user.is_authenticated:
+        #     raise NotAuthenticated
         if request.user != room.owner:
             raise PermissionDenied
         serializer = PhotoSerializer(data=request.data)
