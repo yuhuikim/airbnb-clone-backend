@@ -369,6 +369,12 @@ class RoomBookings(APIView):
 
         # check_in & out의 날짜가 과거의 날짜면 false가 반환되도록 serializer를 커스터마이즈 할 수 있음
         if serializer.is_valid():
-            return Response({"ok": True})
+            booking = serializer.save(
+                room = room,
+                user=request.user,
+                kind=Booking.BookingKindChoices.ROOM,
+            )
+            serializer = PublicBookingSerializer(booking)
+            return Response(serializer.data)
         else:
             return Response(serializer.errors)
