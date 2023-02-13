@@ -52,5 +52,37 @@ class CreateRoomBookingSerializer(serializers.ModelSerializer):
         now = timezone.localtime(timezone.now()).date()
         if now > value:
             raise serializers.ValidationError("Can't book in the past!")
-        # print(value)
         return value
+
+    # 특정 필드가 아닌 모든 필드를 동시에 validate 하려면 아래와 같이 가능 (모든 data를 받아준다.)
+    def validate(self, data):
+        # print(data) # OrderedDict([('check_in', datetime.date(2023, 2, 15)), ('check_out', datetime.date(2023, 2, 16)), ('guests', 2)])
+        if data["check_out"] <= data["check_in"]:
+            raise serializers.ValidationError(
+                "Check_in should be smaller than Check_out"
+            )
+
+        """
+        2022-10-01
+        2022-10-10
+
+        2022-10-03
+        2022-10-07의 경우는 걸러내나
+
+        2022-10-05
+        2022-10-30의 경우는 걸러내지 못함       
+
+        Booking.objects.filter(
+            check_in__gte = data["check_in"],
+            check_out__lte = data["check_out"],
+        ).exists
+        """
+        # 이 코드가 어째서 모든 조건에 예외없이 들어맞을까..!!
+        if Booking.objects.filter(
+            check_in__lte=data["check_out"],
+            check_out__gte=data["check_in"],
+        ).exists():
+            raise serializers.ValidationError(
+                "Those (or some) of those dates are already taken."
+            )
+        return data
