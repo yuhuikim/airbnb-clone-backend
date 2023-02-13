@@ -20,7 +20,7 @@ from categories.models import Category
 from reviews.serializers import ReviewSerializer
 from medias.serializers import PhotoSerializer
 from bookings.models import Booking
-from bookings.serializers import PublicBookingSerializer
+from bookings.serializers import PublicBookingSerializer, CreateRoomBookingSerializer
 
 
 """
@@ -349,12 +349,26 @@ class RoomBookings(APIView):
         # 현지시간
         now = timezone.localtime(timezone.now()).date()
         # 특정 room에 대한 booking 찾기
-        # check_in 날짜가 현재 날짜보다 큰 booking을 찾자! 
+        # check_in 날짜가 현재 날짜보다 큰 booking을 찾자!
         bookings = Booking.objects.filter(
             room=room,
             kind=Booking.BookingKindChoices.ROOM,
             check_in__gt=now,
         )
-        serializer = PublicBookingSerializer(bookings, many=True,)
+        serializer = PublicBookingSerializer(
+            bookings,
+            many=True,
+        )
         return Response(serializer.data)
-    
+
+    def post(self, request, pk):
+        room = self.get_object(pk)
+        # user가 data를 여기로 보내면 serializer가 model의 요구조건에 맞춰서 data를 검증해준다.
+        # user가 "check_in", "check_out", "guests" 을 보내주지 않으면 에러가 난다.
+        serializer = CreateRoomBookingSerializer(data=request.data)
+
+        # check_in & out의 날짜가 과거의 날짜면 false가 반환되도록 serializer를 커스터마이즈 할 수 있음
+        if serializer.is_valid():
+            return Response({"ok": True})
+        else:
+            return Response(serializer.errors)
