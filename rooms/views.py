@@ -15,7 +15,8 @@ from rest_framework.permissions import IsAuthenticatedOrReadOnly
 
 
 from .models import Amenity, Room
-from .serializers import AmenitySerializer, RoomListSerializer, RoomDetailSerializer
+# from .serializers import AmenitySerializer, RoomListSerializer, RoomDetailSerializer
+from .import serializers
 from categories.models import Category
 from reviews.serializers import ReviewSerializer
 from medias.serializers import PhotoSerializer
@@ -36,18 +37,18 @@ class Amenities(APIView):
     # 모든 view function 은 request를 받는다.
     def get(self, request):
         all_amenities = Amenity.objects.all()
-        serializers = AmenitySerializer(all_amenities, many=True)
+        serializers = serializers.AmenitySerializer(all_amenities, many=True)
         return Response(serializers.data)
 
     def post(self, request):
-        serializer = AmenitySerializer(data=request.data)
+        serializer = serializers.AmenitySerializer(data=request.data)
         if serializer.is_valid():
             # ModelSerializer가 자동으로 amenity를 만들게 해야함
             amenity = serializer.save()
 
             # 우리는 당연히 serialize 해줘야 함
             return Response(
-                AmenitySerializer(amenity).data,
+                serializers.AmenitySerializer(amenity).data,
             )
         else:
             return Response(serializer.errors)
@@ -63,13 +64,13 @@ class AmenityDetail(APIView):
 
     def get(self, request, pk):
         amenity = self.get_object(pk)
-        serializer = AmenitySerializer(amenity)
+        serializer = serializers.AmenitySerializer(amenity)
         return Response(serializer.data)
 
     def put(self, request, pk):
         amenity = self.get_object(pk)
         # DB에서 가져온 amenity와 사용자가 보낸 데이터인 request.data를 보내고, 부분적 업데이트라는 것을 parital 로 알려줌
-        serializer = AmenitySerializer(
+        serializer = serializers.AmenitySerializer(
             amenity,
             data=request.data,
             partial=True,
@@ -77,7 +78,7 @@ class AmenityDetail(APIView):
         if serializer.is_valid():
             updated_amenity = serializer.save()
             return Response(
-                AmenitySerializer(updated_amenity).data,
+                serializers.AmenitySerializer(updated_amenity).data,
             )
         else:
             return Response(serializer.errors)
@@ -119,7 +120,7 @@ class Rooms(APIView):
 
     def get(self, request):
         all_rooms = Room.objects.all()
-        serializer = RoomListSerializer(
+        serializer = serializers.RoomListSerializer(
             all_rooms,
             many=True,
             context={
@@ -131,7 +132,7 @@ class Rooms(APIView):
     def post(self, request):
         # 누가 이 url로 요쳥했는지에 관해 많은 정보를 가지고 있음
         # print(dir(request.user))
-        serializer = RoomDetailSerializer(data=request.data)
+        serializer = serializers.RoomDetailSerializer(data=request.data)
         if serializer.is_valid():
             # save(---) 이 괄호에 추가되는 것들은 save를 할 경우 자동으로 create 메서드가 호출되기 때문에
             # create 메서드의 인자인 validated_data에 추가될 것임
@@ -156,7 +157,7 @@ class Rooms(APIView):
                     for amenity_pk in amenities:
                         amenity = Amenity.objects.get(pk=amenity_pk)
                         room.amenities.add(amenity)
-                    serializer = RoomDetailSerializer(room)
+                    serializer = serializers.RoomDetailSerializer(room)
                     return Response(serializer.data)
             except Exception:
                 raise ParseError("Amenity not found")
@@ -178,7 +179,7 @@ class RoomDetail(APIView):
         room = self.get_object(pk)
         # 원하는 메소드 어떤 것이든 serializer의 context에 접근할 수 있음 --> serializer에서 self.context 사용하면 context에 접근가능하다.
         # context를 사용하여 serializer 데이터에 데이터를 보낼 수 있음
-        serializer = RoomDetailSerializer(
+        serializer = serializers.RoomDetailSerializer(
             room,
             context={
                 "request": request,
@@ -193,7 +194,7 @@ class RoomDetail(APIView):
         if room.owner != request.user:
             raise PermissionDenied
         # your magic
-        serializer = RoomDetailSerializer(
+        serializer = serializers.RoomDetailSerializer(
             room,
             data=request.data,
             partial=True,
@@ -219,7 +220,7 @@ class RoomDetail(APIView):
                         for amenity_pk in amenities:
                             amenity = Amenity.objects.get(pk=amenity_pk)
                             room.amenities.add(amenity)
-                            serializer = RoomDetailSerializer(room)
+                            serializer = serializers.RoomDetailSerializer(room)
                     else:
                         room.amenities.clear()
                     return Response(serializer.data)
@@ -369,6 +370,9 @@ class RoomBookings(APIView):
 
         # check_in & out의 날짜가 과거의 날짜면 false가 반환되도록 serializer를 커스터마이즈 할 수 있음
         if serializer.is_valid():
+            """
+            CreateRoomBookingSerializer에는 room, user, kind가 없으므로 
+            """
             booking = serializer.save(
                 room = room,
                 user=request.user,

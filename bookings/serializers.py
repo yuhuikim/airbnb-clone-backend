@@ -13,7 +13,6 @@ class PublicBookingSerializer(serializers.ModelSerializer):
             "check_out",
             "experience_time",
     """
-
     class Meta:
         model = Booking
         fields = (
@@ -61,7 +60,6 @@ class CreateRoomBookingSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 "Check_in should be smaller than Check_out"
             )
-
         """
         2022-10-01
         2022-10-10
