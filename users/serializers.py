@@ -27,3 +27,9 @@ class PrivateUserSerializer(ModelSerializer):
             "groups",
             "user_permissions",
         )
+
+# 코드 챌린지!!
+# 사람들이 내 프로필에서 내 리뷰를 볼 수 있게 한다던지, 내가 얼마나 집을 가지고 있는지, 어떤 도시 여행을 했는지, 나에 대한 리뷰를 볼 수 있게 !
+# 이미 사람들이 room에 대한 리뷰를 볼 수 있는 url을 만들었었다. 즉, user에 대한 리뷰를 만들 면 되는 것!
+class PublicUserSerializer(ModelSerializer):
+    pass

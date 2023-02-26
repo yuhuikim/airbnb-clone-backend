@@ -53,3 +53,34 @@ class Users(APIView):
         else: 
             return Response(serializer.errors)
 
+# http://127.0.0.1:8000/api/v1/users/@admin1
+class PublicUser(APIView):
+    def get(self, request, username):
+        try: 
+            user = User.objects.get(username=username)
+        except User.DoesNotExist:
+            raise NotFound
+        serializer = serializers.PrivateUserSerializer(user)
+        return Response(serializer.data)
+
+
+class ChangePassword(APIView):
+    # 인증되지 않은 user가 호출하지 못하도록 막기
+    permission_classes = [IsAuthenticated]
+
+    def put(self, request):
+        user = request.user
+        # 유튜브 : 노마드 코더 비밀번호 해쉬" 영상 참고하기
+        old_password = request.data.get("old_password")
+        new_password = request.data.get("new_password")
+        if not old_password or not new_password:
+            raise ParseError
+        if user.check_password(old_password):
+            # set_password는 new_password를 hash 할 때만 작동
+            user.set_password(new_password)
+            # 그러니까 아래의 작업이 꼭 필요하다.. --> 왜?
+            user.save()
+            return Response(status=status.HTTP_200_OK)
+        else: 
+            raise ParseError
+
